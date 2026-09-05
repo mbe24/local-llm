@@ -46,13 +46,27 @@
 
   async function generate() {
     // Preflight: confirm a real GPU adapter exists (the API can be present while
-    // requestAdapter() returns null). Fail fast with a clear message.
+    // requestAdapter() returns null). Fail fast with condition-specific guidance.
     const probe = await probeWebGPU();
     if (!probe.ok) {
       status = "error";
-      error =
-        probe.reason +
-        "\n\nCheck https://webgpureport.org/ on this device. If it shows no adapter, this browser/device can't run WebGPU models yet. On Android you can try enabling chrome://flags/#enable-unsafe-webgpu (and restarting Chrome), but some GPUs remain unsupported.";
+      let guidance;
+      if (probe.code === "no-api") {
+        guidance =
+          "\n\nThis needs a browser with WebGPU: Chrome or Edge 121+, or Safari 18+.";
+      } else if (probe.code === "no-adapter") {
+        // The exact condition where enabling the flag fixes it.
+        guidance =
+          "\n\nTo enable WebGPU (this fixes it on most Android phones):" +
+          "\n1. Open a new tab → chrome://flags" +
+          "\n2. Search “WebGPU”" +
+          "\n3. Set “Unsafe WebGPU Support” (#enable-unsafe-webgpu) to Enabled" +
+          "\n4. Relaunch Chrome, then reload this page." +
+          "\n\nConfirm at https://webgpureport.org/ — if it still shows no adapter after that, this device's GPU isn't supported yet.";
+      } else {
+        guidance = "\n\nCheck https://webgpureport.org/ on this device for details.";
+      }
+      error = probe.reason + guidance;
       return;
     }
     text = "";

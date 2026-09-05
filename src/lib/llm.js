@@ -16,23 +16,30 @@ export function browserSupported() {
 }
 
 // A real preflight: the API can exist while requestAdapter() still returns null
-// (e.g. Android Chrome blocklisting the GPU). Returns { ok, reason }.
+// (e.g. WebGPU disabled by flag, or Android Chrome blocklisting the GPU).
+// Returns { ok, code, reason } where code is "no-api" | "no-adapter" | "error"
+// so the UI can give condition-specific guidance.
 export async function probeWebGPU() {
   if (typeof navigator === "undefined" || !navigator.gpu) {
-    return { ok: false, reason: "This browser doesn't expose the WebGPU API." };
+    return { ok: false, code: "no-api", reason: "This browser doesn't expose the WebGPU API." };
   }
   try {
     const adapter = await navigator.gpu.requestAdapter();
     if (!adapter) {
       return {
         ok: false,
+        code: "no-adapter",
         reason:
-          "WebGPU is present but no GPU adapter is available here — requestAdapter() returned null, so on-device models can't run. This is common on Android, where Chrome blocklists many mobile GPUs.",
+          "WebGPU is available but no GPU adapter could be obtained (requestAdapter() returned null). This usually means WebGPU is disabled, or your GPU isn't allow-listed.",
       };
     }
     return { ok: true };
   } catch (e) {
-    return { ok: false, reason: "WebGPU adapter request failed: " + (e?.message || String(e)) };
+    return {
+      ok: false,
+      code: "error",
+      reason: "WebGPU adapter request failed: " + (e?.message || String(e)),
+    };
   }
 }
 
