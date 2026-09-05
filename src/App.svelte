@@ -68,14 +68,25 @@
     let genStart = 0;
     let genTokens = 0; // self-counted: the WebLLM provider reports usage: 0
     let finishReason = "stop";
+    // WebLLM reports progress in phases (fetch, then load-to-GPU), each 0..1.
+    // Track resets so the second sweep reads "Loading into GPU", not a re-download.
+    let phase = 0;
+    let lastProg = 0;
+    const mb = selectedModel ? ` (~${selectedModel.approxMB} MB)` : "";
     try {
       const prompt = buildPrompt(config);
       let first = true;
       const opts = {
         signal: controller.signal,
         onProgress: (r) => {
+          if (r.progress < lastProg - 0.05) phase += 1; // a reset => next phase
+          lastProg = r.progress;
           progress = r.progress;
-          if (r.text) statusText = r.text;
+          if (r.text) {
+            statusText = r.text;
+          } else {
+            statusText = phase === 0 ? `Downloading ${selectedModel?.label ?? "model"}${mb}…` : "Loading into GPU…";
+          }
         },
         onFinish: ({ finishReason: fr }) => {
           if (fr) finishReason = fr;

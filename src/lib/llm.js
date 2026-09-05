@@ -42,6 +42,38 @@ function isWorkerGpuFailure(msg) {
   return /compatible GPU|requestAdapter|GPUAdapter|no adapter|Unknown error/i.test(msg || "");
 }
 
+// Cheap check (no model download) of whether a Worker can get a WebGPU adapter.
+// Lets us pick the worker vs main-thread path BEFORE downloading, so a device
+// where the worker has no GPU doesn't download the model twice.
+async function workerWebGPUAvailable() {
+  if (typeof Worker === "undefined") return false;
+  let w;
+  try {
+    w = new Worker(new URL("../gpu-probe-worker.js", import.meta.url), { type: "module" });
+  } catch {
+    return false;
+  }
+  return new Promise((resolve) => {
+    const done = (v) => {
+      try {
+        w.terminate();
+      } catch {
+        /* ignore */
+      }
+      resolve(v);
+    };
+    const timer = setTimeout(() => done(false), 5000);
+    w.onmessage = (ev) => {
+      clearTimeout(timer);
+      done(!!ev?.data?.ok);
+    };
+    w.onerror = () => {
+      clearTimeout(timer);
+      done(false);
+    };
+  });
+}
+
 class Briefer {
   constructor() {
     this.modelId = null;
@@ -117,13 +149,17 @@ class Briefer {
     if (this.modelId === modelId && this.model) return this.model;
     this.teardown();
 
+    // Decide the path up front (no download) so a worker without a GPU doesn't
+    // pull the model just to fail. Only devices that pass use the worker.
+    const useWorker = await workerWebGPUAvailable();
+
     try {
-      this.model = await this.initEngine(modelId, onProgress, true);
-      this.usingWorker = true;
+      this.model = await this.initEngine(modelId, onProgress, useWorker);
+      this.usingWorker = useWorker;
     } catch (e) {
-      if (isWorkerGpuFailure(e?.reason || e?.message)) {
-        // Retry on the main thread (blocks the UI during generation, but works
-        // where WebGPU is unavailable inside a Worker).
+      // Safety net: if the worker path still failed on GPU, retry on the main
+      // thread (weights are cached from the first attempt, so no re-download).
+      if (useWorker && isWorkerGpuFailure(e?.reason || e?.message)) {
         this.teardown();
         onProgress?.({ progress: 0, text: "Retrying on the main thread…" });
         this.model = await this.initEngine(modelId, onProgress, false);
