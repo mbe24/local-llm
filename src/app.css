@@ -82,15 +82,32 @@ header h1 {
 }
 
 /* Briefing grows to fill the column so its bottom (with Settings below) aligns
-   with the work-order panel, and the output area enlarges to take the slack. */
+   with the work-order panel; the output area takes the slack and scrolls inside
+   a fixed box instead of growing the panel when the briefing is long. */
 .right-col .briefing {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .right-col .briefing .output {
-  flex: 1 1 auto;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Single-column (mobile): the column no longer constrains height, so give the
+   output a fixed scrollable range instead of filling. */
+@media (max-width: 720px) {
+  .right-col .briefing {
+    flex: 0 0 auto;
+  }
+  .right-col .briefing .output {
+    flex: 0 0 auto;
+    min-height: 260px;
+    max-height: 60vh;
+  }
 }
 
 .panel {
