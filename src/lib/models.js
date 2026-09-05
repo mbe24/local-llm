@@ -27,6 +27,18 @@ export const MODELS = [
     approxMB: 194,
     note: "Smallest q4 chat model — quickest to load, roughest output.",
   },
+  {
+    id: "Qwen2.5-0.5B-Instruct-q4f32_1-MLC",
+    label: "Qwen2.5 0.5B (f32)",
+    approxMB: 295,
+    note: "f32 build — runs on GPUs without shader-f16 (many Android phones). Try this if f16 models fail on mobile.",
+  },
+  {
+    id: "SmolLM2-360M-Instruct-q4f32_1-MLC",
+    label: "SmolLM2 360M (f32)",
+    approxMB: 216,
+    note: "Small f32 build — widest GPU support, roughest output.",
+  },
 ];
 
 export const DEFAULT_MODEL = "Qwen2.5-0.5B-Instruct-q4f16_1-MLC";
