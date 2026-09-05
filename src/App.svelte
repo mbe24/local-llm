@@ -7,6 +7,7 @@
   import { briefer, browserSupported } from "./lib/llm.js";
 
   let config = $state(defaultConfig());
+  let view = $state("briefing"); // "briefing" | "settings"
 
   // Recomputes live as the config changes — this is the JS-derived input.
   const derived = $derived(deriveFacts(config));
@@ -17,15 +18,34 @@
   let text = $state("");
   let reasoning = $state(""); // a reasoning model's thinking, if any
   let stats = $state(null); // { outputTokens, tokPerSec, finishReason }
-  let error = $state("");
+  let error = $state(""); // full error detail for the panel
   let controller = null; // AbortController for the in-flight generation
 
   const supported = browserSupported();
 
+  // Print everything we can get out of a thrown value: name, message, the whole
+  // cause chain, and the stack. WebLLM wraps failures as opaque "Unknown error",
+  // so the cause/stack is often the only clue (e.g. mobile WebGPU limits).
+  function formatError(e) {
+    if (e == null) return "Unknown error (no details provided).";
+    if (typeof e === "string") return e;
+    const lines = [];
+    lines.push([e.name, e.message].filter(Boolean).join(": ") || String(e));
+    let cause = e.cause;
+    let guard = 0;
+    while (cause && guard++ < 6) {
+      lines.push("Caused by: " + ([cause.name, cause.message].filter(Boolean).join(": ") || String(cause)));
+      cause = cause.cause;
+    }
+    if (e.stack) lines.push("", String(e.stack));
+    return lines.join("\n");
+  }
+
   async function generate() {
     if (!supported) {
       status = "error";
-      error = "WebGPU isn't available in this browser. Try Chrome or Edge (or Safari 18+).";
+      error =
+        "WebGPU isn't available in this browser.\n\nThis demo needs WebGPU (Chrome/Edge 121+, or Safari 18+). On Android, use a recent Chrome; some devices disable WebGPU or lack the memory for the model.";
       return;
     }
     text = "";
@@ -83,7 +103,7 @@
         statusText = "Stopped.";
       } else {
         status = "error";
-        error = e?.message ?? String(e);
+        error = formatError(e);
       }
     } finally {
       controller = null;
@@ -109,25 +129,33 @@
     {/if}
   </header>
 
-  <div class="grid">
-    <ConfigPanel bind:config disabled={busy} />
-    <div class="right-col">
-      <Briefing
-        {text}
-        {reasoning}
-        {stats}
-        {status}
-        {progress}
-        {statusText}
-        {error}
-        onGenerate={generate}
-        onStop={stop}
-      />
-      <Settings bind:config disabled={busy} />
-    </div>
-  </div>
+  <nav class="tabs">
+    <button class:active={view === "briefing"} onclick={() => (view = "briefing")}>Briefing</button>
+    <button class:active={view === "settings"} onclick={() => (view = "settings")}>Settings</button>
+  </nav>
 
-  <RawJson facts={derived.facts} />
+  {#if view === "briefing"}
+    <div class="grid">
+      <ConfigPanel bind:config disabled={busy} />
+      <div class="right-col">
+        <Briefing
+          {text}
+          {reasoning}
+          {stats}
+          {status}
+          {progress}
+          {statusText}
+          {error}
+          onGenerate={generate}
+          onStop={stop}
+        />
+      </div>
+    </div>
+
+    <RawJson facts={derived.facts} />
+  {:else}
+    <Settings bind:config disabled={busy} />
+  {/if}
 
   <footer>
     <span>Model runs locally via WebGPU · <code>{config.model}</code></span>

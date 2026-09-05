@@ -4,6 +4,17 @@
 
   const json = $derived(JSON.stringify(facts, null, 2));
 
+  // Offer the derived data as a downloadable .json attachment.
+  function download() {
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${facts.work_order ?? "work-order"}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   // Tiny dependency-free JSON highlighter: escape HTML, then wrap tokens
   // (keys, strings, numbers, booleans, null) in classed spans.
   const highlighted = $derived(highlight(json));
@@ -31,10 +42,13 @@
     {open ? "▾" : "▸"} Facts sent to the model
   </button>
   {#if open}
-    <p class="raw-note">
-      The UI edits a flat config; these interdependent facts are derived from it in JS (SLA slack,
-      parts outlook, clearance flag). The model only turns them into prose.
-    </p>
+    <div class="raw-head">
+      <p class="raw-note">
+        The UI edits a flat config; these interdependent facts are derived from it in JS (SLA slack,
+        parts outlook, clearance flag). The model only turns them into prose.
+      </p>
+      <button class="link" onclick={download}>Download JSON</button>
+    </div>
     <pre class="json">{@html highlighted}</pre>
   {/if}
 </div>

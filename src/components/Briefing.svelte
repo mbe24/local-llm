@@ -43,7 +43,10 @@
   {/if}
 
   {#if status === "error"}
-    <p class="error">{error}</p>
+    <div class="error-box">
+      <div class="error-title">Generation failed</div>
+      <pre class="error-detail">{error}</pre>
+    </div>
   {/if}
 
   {#if reasoning}
