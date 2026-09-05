@@ -1,5 +1,6 @@
 <script>
   import { MODELS } from "../lib/models.js";
+  import { clearModelCache } from "../lib/llm.js";
   import {
     DEFAULT_SYSTEM_PROMPT,
     DEFAULT_USER_PROMPT,
@@ -8,6 +9,13 @@
   } from "../lib/scenario.js";
 
   let { config = $bindable(), disabled = false } = $props();
+
+  let cacheMsg = $state("");
+  async function clearCache() {
+    cacheMsg = "Clearing…";
+    await clearModelCache();
+    cacheMsg = "Cleared — the next run re-downloads.";
+  }
 
   const sysModified = $derived(config.systemPrompt !== DEFAULT_SYSTEM_PROMPT);
   const userModified = $derived((config.userPrompt ?? "") !== DEFAULT_USER_PROMPT);
@@ -121,4 +129,16 @@
       example before this.
     </p>
   </div>
+
+  <details class="troubleshooting">
+    <summary>Troubleshooting</summary>
+    <div class="cache-row">
+      <button class="link" onclick={clearCache} disabled={disabled}>Clear cached models</button>
+      {#if cacheMsg}<span class="cache-msg">{cacheMsg}</span>{/if}
+    </div>
+    <p class="prompt-note">
+      Wipes downloaded weights so the next run re-downloads. Try this if output is garbled after a
+      dropped download — a corrupt shard can produce nonsense.
+    </p>
+  </details>
 </div>

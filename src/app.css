@@ -438,6 +438,31 @@ button.stop {
   color: var(--muted);
 }
 
+.troubleshooting {
+  margin-top: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.troubleshooting summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--muted);
+  user-select: none;
+}
+
+.cache-row {
+  margin-top: 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.cache-msg {
+  font-size: 0.8rem;
+  color: var(--accent-2);
+}
+
 .param {
   padding: 4px 0;
 }

@@ -220,3 +220,31 @@ class Briefer {
 
 // One engine for the whole page.
 export const briefer = new Briefer();
+
+// Wipe cached model weights (Cache Storage + IndexedDB) and drop the in-memory
+// engine, so the next generation re-downloads from scratch. Useful when a weight
+// shard cached corrupt during a flaky download (which yields garbage output).
+export async function clearModelCache() {
+  briefer.teardown();
+  const cleared = [];
+  if (typeof caches !== "undefined") {
+    try {
+      for (const name of await caches.keys()) {
+        await caches.delete(name);
+        cleared.push(name);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  if (typeof indexedDB !== "undefined" && indexedDB.databases) {
+    try {
+      for (const db of await indexedDB.databases()) {
+        if (db.name) indexedDB.deleteDatabase(db.name);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return cleared;
+}
