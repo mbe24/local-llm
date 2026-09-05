@@ -10,6 +10,13 @@
   let config = $state(defaultConfig());
   let view = $state("briefing"); // "briefing" | "settings"
 
+  // Mobile GPUs frequently mis-compute f16 (garbled/looping output even when the
+  // model "runs"), so default phones to an f32 build. Desktop keeps the smaller
+  // f16 default.
+  const likelyMobile =
+    typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod|Mobi/i.test(navigator.userAgent || "");
+  if (likelyMobile) config.model = "Qwen2.5-0.5B-Instruct-q4f32_1-MLC";
+
   const selectedModel = $derived(MODELS.find((m) => m.id === config.model));
 
   // Recomputes live as the config changes — this is the JS-derived input.

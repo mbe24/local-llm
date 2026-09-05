@@ -37,6 +37,10 @@
   {#if selected}
     <p class="model-note">{selected.note}</p>
   {/if}
+  <p class="model-note">
+    On phones, f16 models can output garbled or looping text (mobile GPUs often
+    mis-compute f16). If that happens, pick a <strong>(f32)</strong> build.
+  </p>
 
   <div class="params">
     <div class="param">
