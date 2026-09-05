@@ -38,6 +38,18 @@ class Briefer {
       type: "module",
     });
 
+    // WebLLM's worker reports failures as a `{ kind: "throw", content }` message,
+    // then the AI-SDK provider collapses it to "Unknown error". We own the
+    // worker, so listen in and keep the real reason to surface it (mobile GPUs
+    // often fail here: no shader-f16, buffer-size/memory limits, etc.).
+    let workerError = null;
+    this.worker.addEventListener("message", (ev) => {
+      const d = ev?.data;
+      if (d && d.kind === "throw") {
+        workerError = typeof d.content === "string" ? d.content : JSON.stringify(d.content);
+      }
+    });
+
     const model = webLLM(modelId, {
       worker: this.worker,
       // Rich progress reports (fraction + status text) during weight download.
@@ -47,13 +59,27 @@ class Briefer {
       },
     });
 
-    const availability = await model.availability();
-    if (availability === "unavailable") {
-      throw new Error("This browser can't run the model (WebGPU unavailable).");
-    }
-    if (availability === "downloadable") {
-      // Force the download now so progress shows before generation starts.
-      await model.createSessionWithProgress();
+    try {
+      const availability = await model.availability();
+      if (availability === "unavailable") {
+        throw new Error("This browser can't run the model — WebGPU is unavailable.");
+      }
+      if (availability === "downloadable") {
+        // Force the download now so progress shows before generation starts.
+        await model.createSessionWithProgress();
+      }
+    } catch (e) {
+      // Attach the real worker error, which the library otherwise hides.
+      if (workerError) {
+        const err = new Error(
+          `${e?.message || String(e)}\n\nEngine reported:\n${workerError}` +
+            "\n\nOn phones this usually means the GPU lacks a feature the model needs " +
+            "(e.g. shader-f16) or hasn't the memory for it. Try a smaller model, or an f32 build.",
+        );
+        err.cause = e;
+        throw err;
+      }
+      throw e;
     }
 
     this.model = model;
