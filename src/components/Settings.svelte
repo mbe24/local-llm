@@ -1,14 +1,25 @@
 <script>
   import { MODELS } from "../lib/models.js";
-  import { DEFAULT_SYSTEM_PROMPT } from "../lib/scenario.js";
+  import {
+    DEFAULT_SYSTEM_PROMPT,
+    DEFAULT_USER_PROMPT,
+    WORK_DATA_TOKEN,
+    composeUserMessage,
+  } from "../lib/scenario.js";
 
   let { config = $bindable(), disabled = false } = $props();
 
-  const modified = $derived(config.systemPrompt !== DEFAULT_SYSTEM_PROMPT);
+  const sysModified = $derived(config.systemPrompt !== DEFAULT_SYSTEM_PROMPT);
+  const userModified = $derived((config.userPrompt ?? "") !== DEFAULT_USER_PROMPT);
   const selected = $derived(MODELS.find((m) => m.id === config.model));
+  // The exact user message the model will receive (with the work-order JSON).
+  const userMessage = $derived(composeUserMessage(config));
 
-  function resetPrompt() {
+  function resetSystemPrompt() {
     config.systemPrompt = DEFAULT_SYSTEM_PROMPT;
+  }
+  function resetUserPrompt() {
+    config.userPrompt = DEFAULT_USER_PROMPT;
   }
 </script>
 
@@ -63,8 +74,8 @@
 
   <div class="prompt-editor">
     <div class="prompt-head">
-      <span class="prompt-label">System prompt {#if modified}<em>(edited)</em>{/if}</span>
-      <button class="link" onclick={resetPrompt} disabled={disabled || !modified}>
+      <span class="prompt-label">System prompt {#if sysModified}<em>(edited)</em>{/if}</span>
+      <button class="link" onclick={resetSystemPrompt} disabled={disabled || !sysModified}>
         Reset to default
       </button>
     </div>
@@ -74,9 +85,36 @@
       spellcheck="false"
       rows="10"
     ></textarea>
+    <p class="prompt-note">The model's standing instructions (its role and how to write).</p>
+  </div>
+
+  <div class="prompt-editor">
+    <div class="prompt-head">
+      <span class="prompt-label">User prompt {#if userModified}<em>(edited)</em>{/if}</span>
+      <button class="link" onclick={resetUserPrompt} disabled={disabled || !userModified}>
+        Reset to default
+      </button>
+    </div>
+    <textarea
+      bind:value={config.userPrompt}
+      {disabled}
+      spellcheck="false"
+      rows="4"
+      placeholder="(optional) e.g. Brief the tech for {WORK_DATA_TOKEN}"
+    ></textarea>
     <p class="prompt-note">
-      Edit the instructions the model gets. The work-order facts are appended as JSON below this
-      prompt on each run.
+      The request sent with each run. Put <code>{WORK_DATA_TOKEN}</code> where the work-order JSON
+      should go; if you leave it out, the JSON is appended at the end. Empty = just the data.
+    </p>
+  </div>
+
+  <div class="msg-preview-block">
+    <span class="prompt-label">User message the model receives</span>
+    <pre class="msg-preview">{userMessage}</pre>
+    <p class="prompt-note">
+      This is the actual user turn for the current work order — your user prompt with the derived
+      JSON inserted. The model also gets the system prompt above (as instructions) and one worked
+      example before this.
     </p>
   </div>
 </div>

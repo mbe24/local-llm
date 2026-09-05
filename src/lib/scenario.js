@@ -92,6 +92,7 @@ export function defaultConfig() {
     access: { badge: true, escort: false },
     model: DEFAULT_MODEL,
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
+    userPrompt: DEFAULT_USER_PROMPT,
     // Generation parameters (passed straight to the AI SDK / WebLLM).
     temperature: 0.4,
     topP: 0.9,
@@ -245,24 +246,47 @@ Your job is to turn that data into natural spoken language: expand the codes int
 - End with a short **Watch for:** bullet list. If the tech is not cleared, that MUST be the first bullet; then the hazards, then any recurring-issue history.
 - Use only the given facts; invent nothing. Keep it brief. Do not restate the data as a plain list, and do not repeat these instructions. Stop after the Watch-for list.`;
 
-// A user turn carrying the work-order facts.
-function factsMessage(facts) {
-  return "Work order facts:\n```json\n" + JSON.stringify(facts, null, 2) + "\n```";
+// The default user turn: no extra instruction, the data is appended by userTurn.
+export const DEFAULT_USER_PROMPT = "";
+
+// The placeholder a user prompt can use to position the work-order data.
+export const WORK_DATA_TOKEN = "%WORK_DATA%";
+
+// Build a user turn from the editable user prompt + the work-order data.
+// If the prompt contains %WORK_DATA%, the JSON is substituted there; otherwise
+// it is appended at the end (the easy default).
+function userTurn(userPrompt, facts) {
+  const jsonBlock = "```json\n" + JSON.stringify(facts, null, 2) + "\n```";
+  const p = (userPrompt || "").trim();
+  if (p.includes(WORK_DATA_TOKEN)) {
+    return p.replaceAll(WORK_DATA_TOKEN, jsonBlock);
+  }
+  const data = "Work order data:\n" + jsonBlock;
+  return p ? `${p}\n\n${data}` : data;
 }
 
 // Build the prompt for the AI SDK's streamText. In AI SDK v7 the system prompt
 // is the top-level `instructions` option. The worked example is supplied as a
 // real prior turn (few-shot via the messages array, NOT embedded in the system
 // string) so the chat template delimits turns and the model emits one briefing
-// and stops, instead of continuing the text.
+// and stops, instead of continuing the text. The example uses the same user-turn
+// format as the real request so the two stay consistent.
+// The exact user message the model receives for the current config — used by
+// the Settings preview so the JSON's placement is visible, not hidden.
+export function composeUserMessage(config) {
+  const { facts } = deriveFacts(config);
+  return userTurn(config.userPrompt ?? DEFAULT_USER_PROMPT, facts);
+}
+
 export function buildPrompt(config) {
   const { facts } = deriveFacts(config);
+  const up = config.userPrompt ?? DEFAULT_USER_PROMPT;
   return {
     instructions: config.systemPrompt || DEFAULT_SYSTEM_PROMPT,
     messages: [
-      { role: "user", content: factsMessage(EXAMPLE_FACTS) },
+      { role: "user", content: userTurn(up, EXAMPLE_FACTS) },
       { role: "assistant", content: EXAMPLE_DISPATCH },
-      { role: "user", content: factsMessage(facts) },
+      { role: "user", content: userTurn(up, facts) },
     ],
   };
 }
