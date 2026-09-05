@@ -1,6 +1,8 @@
 // Thin wrapper around @browser-ai/web-llm + the Vercel AI SDK.
 //
-// - Inference runs in a Web Worker (src/worker.js), so the UI never blocks.
+// - Inference runs in a Web Worker (src/worker.js) so the UI never blocks —
+//   with a fallback to the main thread on devices (e.g. Android Chrome) where
+//   WebGPU works on the page but not inside a Worker.
 // - The 200 MB+ first download is reported through the engine's
 //   initProgressCallback, which gives both a 0..1 fraction AND a human-readable
 //   status string ("Loading model from cache[5/24]", "Loading GPU shaders"…).
@@ -13,78 +15,98 @@ export function browserSupported() {
   return doesBrowserSupportWebLLM();
 }
 
+// A worker failing to get a GPU is the signature of a device (notably Android
+// Chrome) that exposes WebGPU on the page but not inside a dedicated Worker.
+function isWorkerGpuFailure(msg) {
+  return /compatible GPU|requestAdapter|GPUAdapter|no adapter|Unknown error/i.test(msg || "");
+}
+
 class Briefer {
   constructor() {
     this.modelId = null;
     this.model = null;
     this.worker = null;
+    this.usingWorker = true; // whether the active engine runs off the main thread
   }
 
-  // Ensure the requested model is downloaded and ready.
-  // `onProgress(report)` receives { progress: 0..1, text: string } during the
-  // initial download; it's not called once the model is already resident.
-  async ensure(modelId, onProgress) {
-    if (this.modelId === modelId && this.model) return this.model;
-
-    // Switching models: tear down the old worker so we don't leak engines.
+  teardown() {
     if (this.worker) {
       this.worker.terminate();
       this.worker = null;
     }
     this.model = null;
     this.modelId = null;
+  }
 
-    this.worker = new Worker(new URL("../worker.js", import.meta.url), {
-      type: "module",
-    });
-
-    // WebLLM's worker reports failures as a `{ kind: "throw", content }` message,
-    // then the AI-SDK provider collapses it to "Unknown error". We own the
-    // worker, so listen in and keep the real reason to surface it (mobile GPUs
-    // often fail here: no shader-f16, buffer-size/memory limits, etc.).
+  // Build and warm up an engine, either in a Worker or on the main thread.
+  async initEngine(modelId, onProgress, useWorker) {
     let workerError = null;
-    this.worker.addEventListener("message", (ev) => {
-      const d = ev?.data;
-      if (d && d.kind === "throw") {
-        workerError = typeof d.content === "string" ? d.content : JSON.stringify(d.content);
-      }
-    });
-
-    const model = webLLM(modelId, {
-      worker: this.worker,
-      // Rich progress reports (fraction + status text) during weight download.
+    const settings = {
       engineConfig: {
         initProgressCallback: (report) =>
           onProgress?.({ progress: report.progress ?? 0, text: report.text ?? "" }),
       },
-    });
+    };
 
+    if (useWorker) {
+      this.worker = new Worker(new URL("../worker.js", import.meta.url), { type: "module" });
+      // WebLLM's worker reports failures as `{ kind: "throw", content }`, then the
+      // provider collapses it to "Unknown error". We own the worker, so keep the
+      // real reason.
+      this.worker.addEventListener("message", (ev) => {
+        const d = ev?.data;
+        if (d && d.kind === "throw") {
+          workerError = typeof d.content === "string" ? d.content : JSON.stringify(d.content);
+        }
+      });
+      settings.worker = this.worker;
+    }
+
+    const model = webLLM(modelId, settings);
     try {
       const availability = await model.availability();
       if (availability === "unavailable") {
         throw new Error("This browser can't run the model — WebGPU is unavailable.");
       }
       if (availability === "downloadable") {
-        // Force the download now so progress shows before generation starts.
         await model.createSessionWithProgress();
       }
     } catch (e) {
-      // Attach the real worker error, which the library otherwise hides.
-      if (workerError) {
-        const err = new Error(
-          `${e?.message || String(e)}\n\nEngine reported:\n${workerError}` +
-            "\n\nOn phones this usually means the GPU lacks a feature the model needs " +
-            "(e.g. shader-f16) or hasn't the memory for it. Try a smaller model, or an f32 build.",
-        );
-        err.cause = e;
-        throw err;
+      const reason = workerError || e?.message || String(e);
+      const err = new Error(workerError ? `${e?.message || String(e)}\n\nEngine reported:\n${workerError}` : reason);
+      err.cause = e;
+      err.reason = reason;
+      throw err;
+    }
+    return model;
+  }
+
+  // Ensure the requested model is downloaded and ready. Tries a Web Worker first
+  // (non-blocking UI); if the worker can't get a GPU — common on Android Chrome —
+  // falls back to running on the main thread.
+  // `onProgress(report)` receives { progress: 0..1, text: string } during download.
+  async ensure(modelId, onProgress) {
+    if (this.modelId === modelId && this.model) return this.model;
+    this.teardown();
+
+    try {
+      this.model = await this.initEngine(modelId, onProgress, true);
+      this.usingWorker = true;
+    } catch (e) {
+      if (isWorkerGpuFailure(e?.reason || e?.message)) {
+        // Retry on the main thread (blocks the UI during generation, but works
+        // where WebGPU is unavailable inside a Worker).
+        this.teardown();
+        onProgress?.({ progress: 0, text: "Retrying on the main thread…" });
+        this.model = await this.initEngine(modelId, onProgress, false);
+        this.usingWorker = false;
+      } else {
+        throw e;
       }
-      throw e;
     }
 
-    this.model = model;
     this.modelId = modelId;
-    return model;
+    return this.model;
   }
 
   // Stream a briefing. Yields typed parts { kind: "text" | "reasoning", text }
