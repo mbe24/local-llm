@@ -4,7 +4,7 @@
   import RawJson from "./components/RawJson.svelte";
   import Settings from "./components/Settings.svelte";
   import { defaultConfig, deriveFacts, buildPrompt } from "./lib/scenario.js";
-  import { briefer, browserSupported } from "./lib/llm.js";
+  import { briefer, browserSupported, probeWebGPU } from "./lib/llm.js";
 
   let config = $state(defaultConfig());
   let view = $state("briefing"); // "briefing" | "settings"
@@ -42,10 +42,14 @@
   }
 
   async function generate() {
-    if (!supported) {
+    // Preflight: confirm a real GPU adapter exists (the API can be present while
+    // requestAdapter() returns null). Fail fast with a clear message.
+    const probe = await probeWebGPU();
+    if (!probe.ok) {
       status = "error";
       error =
-        "WebGPU isn't available in this browser.\n\nThis demo needs WebGPU (Chrome/Edge 121+, or Safari 18+). On Android, use a recent Chrome; some devices disable WebGPU or lack the memory for the model.";
+        probe.reason +
+        "\n\nCheck https://webgpureport.org/ on this device. If it shows no adapter, this browser/device can't run WebGPU models yet. On Android you can try enabling chrome://flags/#enable-unsafe-webgpu (and restarting Chrome), but some GPUs remain unsupported.";
       return;
     }
     text = "";
