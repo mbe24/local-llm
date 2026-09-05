@@ -1,0 +1,509 @@
+:root {
+  --bg: #0f1115;
+  --panel: #171a21;
+  --panel-2: #1e222b;
+  --border: #2a2f3a;
+  --text: #e6e8ec;
+  --muted: #98a1b3;
+  --accent: #89b4fa;
+  --accent-2: #6ee7b7;
+  --warn: #f7c948;
+  --error: #f38ba8;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --panel-2: #f0f2f5;
+    --border: #d9dde4;
+    --text: #1a1d23;
+    --muted: #5b6472;
+    --accent: #2563eb;
+    --accent-2: #059669;
+    --warn: #b7791f;
+    --error: #c53030;
+    color-scheme: light;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.55 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 28px 20px 48px;
+}
+
+header h1 {
+  margin: 0 0 4px;
+  font-size: 1.5rem;
+}
+
+.tagline {
+  margin: 0 0 8px;
+  color: var(--muted);
+}
+
+.warn {
+  color: var(--warn);
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+@media (max-width: 720px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.right-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* Briefing grows to fill the column so its bottom (with Settings below) aligns
+   with the work-order panel, and the output area enlarges to take the slack. */
+.right-col .briefing {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.right-col .briefing .output {
+  flex: 1 1 auto;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.panel h2 {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+/* ---- Config form ---- */
+.config label {
+  display: block;
+  margin: 10px 0;
+}
+
+.config label > span {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.config label > span em {
+  color: var(--accent);
+  font-style: normal;
+  float: right;
+}
+
+.config label.inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.config label.inline > span {
+  margin-bottom: 0;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.config fieldset {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px 12px;
+  margin: 14px 0;
+}
+
+.config legend {
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 6px;
+}
+
+.config input[type="number"],
+.config select {
+  width: 100%;
+  padding: 6px 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+}
+
+.config input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.config input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+/* ---- Briefing ---- */
+.briefing-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.briefing-head h2 {
+  margin: 0;
+}
+
+button {
+  font: inherit;
+  font-weight: 600;
+  padding: 7px 16px;
+  border: none;
+  border-radius: 7px;
+  background: var(--accent);
+  color: #0b1020;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+button.stop {
+  background: var(--error);
+  color: #1a0308;
+}
+
+.progress .live {
+  color: var(--accent-2);
+}
+
+@media (prefers-color-scheme: light) {
+  button.stop {
+    color: #fff;
+  }
+}
+
+.output {
+  min-height: 220px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  font-size: 1.02rem;
+  line-height: 1.6;
+}
+
+.output.empty {
+  color: var(--muted);
+}
+
+.hint {
+  font-style: italic;
+}
+
+.progress {
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.progress .bar {
+  height: 6px;
+  background: var(--panel-2);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.progress .fill {
+  height: 100%;
+  background: var(--accent-2);
+  transition: width 0.2s ease;
+}
+
+.error {
+  color: var(--error);
+}
+
+/* ---- Reasoning + stats ---- */
+.reasoning {
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+
+.reasoning summary {
+  cursor: pointer;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  user-select: none;
+}
+
+.reasoning-body {
+  padding: 0 12px 12px;
+  font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--muted);
+  white-space: pre-wrap;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.stats {
+  margin-top: 10px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* ---- Markdown in the output ---- */
+.output :first-child {
+  margin-top: 0;
+}
+.output :last-child {
+  margin-bottom: 0;
+}
+.output p {
+  margin: 0 0 0.7em;
+}
+.output ul,
+.output ol {
+  margin: 0.4em 0 0.7em;
+  padding-left: 1.3em;
+}
+.output li {
+  margin: 0.15em 0;
+}
+/* Collapse loose-list <p> wrappers so bullets don't get big gaps. */
+.output li p {
+  margin: 0;
+}
+.output strong {
+  color: var(--text);
+}
+.output h1,
+.output h2,
+.output h3 {
+  font-size: 1.02rem;
+  margin: 0.4em 0;
+}
+
+/* ---- Settings (model + system prompt) ---- */
+
+.model-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.model-row > span {
+  font-size: 0.85rem;
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+
+.settings select {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 6px 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+}
+
+.params {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.model-note {
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.param {
+  padding: 4px 0;
+}
+
+.param-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.param-head em {
+  color: var(--accent);
+  font-style: normal;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.param input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+  margin: 2px 0;
+}
+
+.param-note {
+  margin: 2px 0 0;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.prompt-editor {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.prompt-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.prompt-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.prompt-label em {
+  color: var(--accent);
+  font-style: normal;
+}
+
+button.link {
+  background: none;
+  color: var(--accent);
+  padding: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.settings textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 10px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.prompt-note {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin: 8px 0 0;
+}
+
+/* ---- Raw JSON ---- */
+.raw {
+  margin-top: 16px;
+}
+
+.json .j-key {
+  color: var(--accent);
+}
+.json .j-str {
+  color: var(--accent-2);
+}
+.json .j-num {
+  color: #f0a868;
+}
+.json .j-bool {
+  color: #c792ea;
+}
+.json .j-null {
+  color: var(--muted);
+}
+
+@media (prefers-color-scheme: light) {
+  .json .j-num {
+    color: #b45309;
+  }
+  .json .j-bool {
+    color: #7c3aed;
+  }
+}
+
+.disclose {
+  background: none;
+  color: var(--accent);
+  padding: 0;
+  font-weight: 600;
+}
+
+.raw-note {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 10px 0;
+}
+
+.raw pre {
+  margin: 0;
+  overflow-x: auto;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+footer {
+  margin-top: 24px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+footer code,
+main code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}

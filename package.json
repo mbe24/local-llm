@@ -1,0 +1,24 @@
+{
+  "name": "local-llm-briefing",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "In-browser LLM demo: structured work-order metadata woven into a prose dispatch briefing by a small local model over WebGPU.",
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@browser-ai/web-llm": "^3.0.2",
+    "@mlc-ai/web-llm": "^0.2.79",
+    "ai": "^7.0.0",
+    "marked": "^18.0.11"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "svelte": "^5.0.0",
+    "vite": "^6.0.0"
+  }
+}
