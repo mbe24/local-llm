@@ -1,68 +1,69 @@
 // The heart of the showcase.
 //
-// The UI edits a small, flat `config`. From it we DERIVE a richer, interdependent
-// `facts` object — resolving the SLA clock, the skill gap, the parts outlook, and
-// the history into qualitative phrasings. All the reasoning that a template can't
-// fake (time math, "second trip likely", "may exceed your clearance") happens
-// HERE, in plain JS. The model never does arithmetic; it only weaves the facts
-// into prose. That keeps even a tiny model convincing while proving the output
-// is generated, not string-concatenated.
+// The UI edits a small, flat `config`. From it we DERIVE a terse, structured
+// `facts` data model — enums, numbers, booleans, short labels — NOT prose.
+// The reasoning a template can't fake (SLA slack, the second-trip decision,
+// the clearance flag) happens HERE, in plain JS, but it emits VALUES, not
+// sentences. The MODEL does the real work: turning that data into natural
+// language. Rule: values yes, sentences no. And never make the model do
+// arithmetic — JS formats durations before they reach it.
 
 import { DEFAULT_MODEL } from "./models.js";
 
 // Per-trade scenario flavor. Changing the category swaps the whole situation
 // (customer, symptom, parts, the skill a missing clearance refers to), so the
-// briefing changes wholesale, not just a noun.
+// briefing changes wholesale, not just a noun. Every field here is terse data:
+// short noun phrases and labels, never a full sentence.
 export const TRADES = {
   HVAC: {
     code: 4471,
     customer: "Meridian Cold Storage",
-    consequence: "refrigerated warehouse — every hour down risks spoiling stored inventory",
-    problem: "a rooftop AC unit tripping its breaker intermittently",
-    partOnHand: "40A contactor",
-    partBlocked: "CB-7 control board",
-    skillGap: "high-voltage panel work",
-    hazards: { rooftop: true, electrical: true },
+    environment: "refrigerated warehouse",
+    downtimeImpact: "spoils stored inventory",
+    problem: "rooftop AC unit tripping breaker intermittently",
+    quickFixPart: "40A contactor",
+    fullFixPart: "CB-7 control board",
+    requiredSkill: "high-voltage panel",
   },
   Plumbing: {
     code: 2287,
     customer: "Kestrel Apartments",
-    consequence: "occupied residential block with an active water leak",
-    problem: "a burst supply line flooding a ground-floor utility closet",
-    partOnHand: '1" PEX coupling',
-    partBlocked: "pressure-reducing valve",
-    skillGap: "backflow certification",
-    hazards: { rooftop: false, electrical: false },
+    environment: "occupied residential block",
+    downtimeImpact: "active water leak",
+    problem: "burst supply line flooding a utility closet",
+    quickFixPart: '1" PEX coupling',
+    fullFixPart: "pressure-reducing valve",
+    requiredSkill: "backflow certification",
   },
   Electrical: {
     code: 5106,
     customer: "Harlow Logistics",
-    consequence: "distribution centre with half its loading bays dark",
-    problem: "a sub-panel throwing intermittent ground faults",
-    partOnHand: "20A GFCI breaker",
-    partBlocked: "200A main-lug panel",
-    skillGap: "medium-voltage switchgear",
-    hazards: { rooftop: false, electrical: true },
+    environment: "distribution centre",
+    downtimeImpact: "half the loading bays dark",
+    problem: "sub-panel throwing intermittent ground faults",
+    quickFixPart: "20A GFCI breaker",
+    fullFixPart: "200A main-lug panel",
+    requiredSkill: "medium-voltage switchgear",
   },
   Refrigeration: {
     code: 3390,
     customer: "Tannhauser Foods",
-    consequence: "commercial kitchen whose walk-in freezer is losing temperature",
-    problem: "a walk-in freezer compressor short-cycling",
-    partOnHand: "start capacitor",
-    partBlocked: "condenser fan motor",
-    skillGap: "EPA 608 refrigerant handling",
-    hazards: { rooftop: false, electrical: true },
+    environment: "commercial kitchen",
+    downtimeImpact: "walk-in freezer losing temperature",
+    problem: "walk-in freezer compressor short-cycling",
+    quickFixPart: "start capacitor",
+    fullFixPart: "condenser fan motor",
+    requiredSkill: "EPA 608 refrigerant handling",
   },
   Elevator: {
     code: 6120,
     customer: "Cassin Medical Center",
-    consequence: "a hospital with one of its two service elevators out",
-    problem: "a service elevator stalling between floors",
-    partOnHand: "door interlock switch",
-    partBlocked: "hoistway controller board",
-    skillGap: "traction-machine lockout",
-    hazards: { rooftop: false, electrical: true },
+    environment: "hospital",
+    downtimeImpact: "one of two service elevators out",
+    problem: "service elevator stalling between floors",
+    quickFixPart: "door interlock switch",
+    fullFixPart: "hoistway controller board",
+    requiredSkill: "traction-machine lockout",
   },
 };
 
@@ -115,138 +116,134 @@ function priorityLabel(p) {
   return "low";
 }
 
-// config -> { id, facts } where `facts` is the interdependency-resolved object
-// we actually hand to the model (and show in the raw-JSON pane).
+// config -> { id, facts } where `facts` is a terse structured DATA model (enums,
+// numbers, booleans, short labels — never sentences). Shown verbatim in the
+// raw-JSON pane and handed to the model, whose job is to voice it as prose.
 export function deriveFacts(config) {
   const trade = TRADES[config.category];
   const id = `WO-${trade.code}`;
 
-  // --- SLA clock: the classic "template can't do this" bit, done in JS. ---
+  // --- SLA clock: the arithmetic is done here; only VALUES escape. ---
   const windowMin = config.slaHours * 60;
   const sparMin = windowMin - config.elapsedMin - config.travelMin; // slack on arrival
-  const clock =
-    sparMin <= 0
-      ? {
-          standing: "response window already blown",
-          pressure: "breached",
-          travelNote: `the ${config.travelMin}-minute drive pushes you past the deadline`,
-        }
-      : {
-          standing: `about ${fmtDuration(sparMin)} of slack left once you arrive`,
-          pressure: sparMin <= 45 ? "very tight" : sparMin <= 90 ? "tight" : "comfortable",
-          travelNote: `the drive eats roughly ${config.travelMin} minutes of the window`,
-        };
-
-  // --- Parts outlook: quick fix vs. blocked full fix -> one/two trips. ---
-  let parts;
-  if (!config.partInStock) {
-    parts = {
-      outlook: "assess-only",
-      detail: `the ${trade.partOnHand} for even a temporary fix isn't in the van`,
-    };
-  } else if (config.partEtaDays > 0) {
-    parts = {
-      outlook: "partial fix today, second trip likely",
-      detail: `you can stabilise it with the ${trade.partOnHand} on hand, but the ${trade.partBlocked} is ${config.partEtaDays} day(s) out`,
-    };
+  const sla = {
+    window_min: windowMin,
+    elapsed_min: config.elapsedMin,
+    travel_min: config.travelMin,
+  };
+  if (sparMin <= 0) {
+    sla.overdue_by = fmtDuration(-sparMin); // JS formats the duration, not the model
+    sla.status = "breached";
   } else {
-    parts = {
-      outlook: "one visit should do it",
-      detail: `both the ${trade.partOnHand} and the ${trade.partBlocked} are on hand`,
-    };
+    sla.slack_on_arrival = fmtDuration(sparMin);
+    sla.status = sparMin <= 45 ? "very_tight" : sparMin <= 90 ? "tight" : "comfortable";
   }
 
-  // --- Safety flags from the hazard toggles. ---
-  const safety = Object.entries(config.hazards)
+  // --- Parts outlook: quick fix vs. blocked full fix -> the decision as an enum. ---
+  let outlook;
+  if (!config.partInStock) outlook = "assess_only";
+  else if (config.partEtaDays > 0) outlook = "second_trip";
+  else outlook = "one_visit";
+
+  const parts = {
+    quick_fix: { part: trade.quickFixPart, in_van: config.partInStock },
+    full_fix: { part: trade.fullFixPart, eta_days: config.partEtaDays },
+    outlook,
+  };
+
+  // --- Hazards as enum tags. ---
+  const hazards = Object.entries(config.hazards)
     .filter(([, on]) => on)
-    .map(([k]) => HAZARD_LABELS[k])
+    .map(([k]) => HAZARD_TAGS[k])
     .filter(Boolean);
 
-  // --- Site access notes (badge / escort) woven into the prose. ---
-  const accessNotes = [];
-  if (config.access.badge) accessNotes.push("badge in at the front desk");
-  if (config.access.escort) accessNotes.push("you'll need an on-site escort");
-
   const facts = {
-    workOrder: id,
-    trade: config.category,
-    customer: trade.customer,
-    account: config.tier === "enterprise" ? "enterprise account" : "standard account",
-    consequence: trade.consequence,
+    work_order: id,
+    trade: config.category.toLowerCase(),
     problem: trade.problem,
+    site: {
+      customer: trade.customer,
+      account: config.tier, // "enterprise" | "standard"
+      environment: trade.environment,
+      downtime_impact: trade.downtimeImpact,
+    },
     priority: priorityLabel(config.priority),
-    clock,
+    sla,
     clearance:
       config.clearance === "missing"
-        ? { flag: true, gap: `this job may exceed your clearance — it needs ${trade.skillGap}` }
-        : { flag: false, note: "you're fully cleared for this work" },
+        ? { cleared: false, required_skill: trade.requiredSkill }
+        : { cleared: true },
     parts,
     history: config.recurring
-      ? {
-          repeat: true,
-          detail: `${config.priorVisits} prior visit(s); the last temporary fix didn't hold`,
-        }
-      : { repeat: false },
-    safety,
-    ...(accessNotes.length ? { access: accessNotes.join("; ") } : {}),
+      ? { recurring: true, prior_visits: config.priorVisits, last_temp_fix_held: false }
+      : { recurring: false },
+    hazards,
+    access: {
+      badge: config.access.badge ? "required" : "not_required",
+      escort: config.access.escort ? "required" : "not_required",
+    },
   };
 
   return { id, facts };
 }
 
-// Hazard toggle -> the phrase that lands in the Watch-for list.
-const HAZARD_LABELS = {
-  rooftop: "rooftop work",
-  electrical: "live electrical",
-  confinedSpace: "confined space",
-  chemical: "chemical / refrigerant exposure",
-  heavyLift: "heavy lifting",
+// Hazard toggle -> the enum tag that lands in facts.hazards.
+const HAZARD_TAGS = {
+  rooftop: "rooftop",
+  electrical: "live_electrical",
+  confinedSpace: "confined_space",
+  chemical: "chemical",
+  heavyLift: "heavy_lifting",
 };
 
 const EXAMPLE_FACTS = {
-  workOrder: "WO-3310",
-  trade: "Refrigeration",
-  customer: "Tannhauser Foods",
-  account: "enterprise account",
-  consequence: "commercial kitchen whose walk-in freezer is losing temperature",
-  problem: "a walk-in freezer compressor short-cycling",
+  work_order: "WO-3310",
+  trade: "refrigeration",
+  problem: "walk-in freezer compressor short-cycling",
+  site: {
+    customer: "Tannhauser Foods",
+    account: "enterprise",
+    environment: "commercial kitchen",
+    downtime_impact: "walk-in freezer losing temperature",
+  },
   priority: "high",
-  clock: {
-    standing: "about 2h of slack left once you arrive",
-    pressure: "comfortable",
-    travelNote: "the drive eats roughly 40 minutes of the window",
+  sla: {
+    window_min: 240,
+    elapsed_min: 30,
+    travel_min: 40,
+    slack_on_arrival: "2h 50m",
+    status: "comfortable",
   },
-  clearance: {
-    flag: true,
-    gap: "this job may exceed your clearance — it needs EPA 608 refrigerant handling",
-  },
+  clearance: { cleared: false, required_skill: "EPA 608 refrigerant handling" },
   parts: {
-    outlook: "partial fix today, second trip likely",
-    detail:
-      "you can stabilise it with the start capacitor on hand, but the condenser fan motor is 3 day(s) out",
+    quick_fix: { part: "start capacitor", in_van: true },
+    full_fix: { part: "condenser fan motor", eta_days: 3 },
+    outlook: "second_trip",
   },
-  history: { repeat: true, detail: "2 prior visit(s); the last temporary fix didn't hold" },
-  safety: ["live electrical"],
-  access: "badge in at the front desk",
+  history: { recurring: true, prior_visits: 2, last_temp_fix_held: false },
+  hazards: ["live_electrical"],
+  access: { badge: "required", escort: "not_required" },
 };
 
 const EXAMPLE_DISPATCH = `Hey — you're up next.
 
 **WO-3310 — walk-in freezer short-cycling at Tannhauser Foods.**
 
-Enterprise account that's losing product by the hour, so treat it as urgent even though the clock's comfortable — about 2h of slack once you arrive. Badge in at the front desk when you get there. You can stabilise it today with the start capacitor in your van, but the condenser fan motor is three days out, so plan on a **second trip** to finish it.
+Enterprise account that's losing product by the hour, so treat it as urgent even though the clock's comfortable — about 2h 50m of slack once you arrive. Badge in at the front desk when you get there. You can stabilise it today with the start capacitor in your van, but the condenser fan motor is three days out, so plan on a **second trip** to finish it.
 
 **Watch for:**
 - **May exceed your clearance** — needs EPA 608 refrigerant handling
 - **Live electrical** at the compressor
 - Bitten us twice before; the last temporary fix didn't hold`;
 
-export const DEFAULT_SYSTEM_PROMPT = `You are a dispatcher. Given a work order as JSON facts, you reply with ONE short, brief job briefing in Markdown — and nothing after it.
+export const DEFAULT_SYSTEM_PROMPT = `You are a dispatcher. You are given a work order as terse structured JSON — enums, numbers, booleans and short labels — and you reply with ONE short, brief job briefing in Markdown, and nothing after it.
+
+Your job is to turn that data into natural spoken language: expand the codes into plain English (e.g. status "comfortable" -> "the clock's comfortable"; outlook "second_trip" -> "plan on a second trip"; hazard "live_electrical" -> "live electrical"; access badge "required" -> "badge in at the desk"). Use the durations exactly as given — do not compute or change any numbers.
 
 - Open with a brief, casual greeting to the tech (a few words), then a one-line **bold headline**: work-order number, the problem in a few words, and the site.
-- Then two or three short sentences: the situation and why it matters, the time on the clock, any site-access notes (badge, escort), and the parts / second-trip outlook. Address the tech as "you". No sign-off.
-- End with a short **Watch for:** bullet list. If the facts flag a clearance gap, it MUST be the first bullet; then safety hazards, then any recurring-issue history.
-- Use only the given facts; invent nothing. Keep it brief. Do not restate the facts as a plain list, and do not repeat these instructions. Stop after the Watch-for list.`;
+- Then two or three short sentences: the situation and why it matters, the time on the clock, any site-access requirements (badge, escort), and the parts / second-trip outlook. Address the tech as "you". No sign-off.
+- End with a short **Watch for:** bullet list. If the tech is not cleared, that MUST be the first bullet; then the hazards, then any recurring-issue history.
+- Use only the given facts; invent nothing. Keep it brief. Do not restate the data as a plain list, and do not repeat these instructions. Stop after the Watch-for list.`;
 
 // A user turn carrying the work-order facts.
 function factsMessage(facts) {

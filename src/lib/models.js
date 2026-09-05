@@ -10,16 +10,16 @@
 // the practical floor for an off-the-shelf q4 chat model.
 export const MODELS = [
   {
-    id: "Qwen2.5-0.5B-Instruct-q4f16_1-MLC",
-    label: "Qwen2.5 0.5B",
-    approxMB: 265,
-    note: "Clean instruct model — best coherence for the dispatch. Default.",
-  },
-  {
     id: "Qwen3-0.6B-q4f16_1-MLC",
     label: "Qwen3 0.6B",
     approxMB: 320,
-    note: "Reasoning model — shows its thinking before the dispatch.",
+    note: "Handles the structured data model best — full briefing, accurate. Default.",
+  },
+  {
+    id: "Qwen2.5-0.5B-Instruct-q4f16_1-MLC",
+    label: "Qwen2.5 0.5B",
+    approxMB: 265,
+    note: "Lighter; expands the data but drops sections and garbles some fields.",
   },
   {
     id: "SmolLM2-360M-Instruct-q4f16_1-MLC",
