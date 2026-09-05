@@ -4,10 +4,13 @@
   import RawJson from "./components/RawJson.svelte";
   import Settings from "./components/Settings.svelte";
   import { defaultConfig, deriveFacts, buildPrompt } from "./lib/scenario.js";
+  import { MODELS } from "./lib/models.js";
   import { briefer, browserSupported, probeWebGPU } from "./lib/llm.js";
 
   let config = $state(defaultConfig());
   let view = $state("briefing"); // "briefing" | "settings"
+
+  const selectedModel = $derived(MODELS.find((m) => m.id === config.model));
 
   // Recomputes live as the config changes — this is the JS-derived input.
   const derived = $derived(deriveFacts(config));
@@ -57,7 +60,9 @@
     stats = null;
     error = "";
     progress = 0;
-    statusText = "Preparing model…";
+    statusText = `Loading ${selectedModel?.label ?? "model"}${
+      selectedModel ? ` — first run downloads ~${selectedModel.approxMB} MB` : ""
+    }…`;
     status = "loading";
     controller = new AbortController();
     let genStart = 0;
@@ -107,7 +112,12 @@
         statusText = "Stopped.";
       } else {
         status = "error";
-        error = formatError(e);
+        const detail = formatError(e);
+        // A network failure mid-download is common on mobile — guide a retry.
+        error = /failed to fetch|networkerror|load failed/i.test(detail)
+          ? "Couldn't download the model weights (network error). The download is large and can fail partway on a mobile connection — check your connection and press Generate again. A smaller model (SmolLM2 360M) downloads less.\n\n" +
+            detail
+          : detail;
       }
     } finally {
       controller = null;
