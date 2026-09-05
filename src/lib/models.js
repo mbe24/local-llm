@@ -13,13 +13,13 @@ export const MODELS = [
     id: "Qwen3-0.6B-q4f16_1-MLC",
     label: "Qwen3 0.6B",
     approxMB: 320,
-    note: "Handles the structured data model best — full briefing, accurate. Default.",
+    note: "Handles the structured data model best — full briefing, accurate. Heaviest.",
   },
   {
     id: "Qwen2.5-0.5B-Instruct-q4f16_1-MLC",
     label: "Qwen2.5 0.5B",
     approxMB: 265,
-    note: "Lighter; expands the data but drops sections and garbles some fields.",
+    note: "Medium — good balance of quality and load; friendlier on mobile. Default.",
   },
   {
     id: "SmolLM2-360M-Instruct-q4f16_1-MLC",
@@ -29,4 +29,4 @@ export const MODELS = [
   },
 ];
 
-export const DEFAULT_MODEL = MODELS[0].id;
+export const DEFAULT_MODEL = "Qwen2.5-0.5B-Instruct-q4f16_1-MLC";
