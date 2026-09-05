@@ -44,13 +44,6 @@ npm run build      # static site into dist/
 npm run preview    # serve the built dist/ locally
 ```
 
-## Deploy to GitHub Pages
-
-`.github/workflows/pages.yml` builds and publishes `dist/` on every push to
-`main`. Enable it once under **Settings → Pages → Build and deployment → Source:
-GitHub Actions**. Vite's `base: "./"` keeps asset paths relative, so it works
-under the `/<repo>/` project subpath without any repo-name config.
-
 ## Layout
 
 ```text
