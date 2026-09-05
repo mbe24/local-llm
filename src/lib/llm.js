@@ -90,7 +90,14 @@ class Briefer {
         throw new Error("This browser can't run the model — WebGPU is unavailable.");
       }
       if (availability === "downloadable") {
-        await model.createSessionWithProgress();
+        // The library forwards download progress through THIS callback (it
+        // overrides engineConfig.initProgressCallback), so pass it here or the
+        // bar never moves. The arg is a 0..1 number (or a {progress,text} report).
+        await model.createSessionWithProgress((p) => {
+          const progress = typeof p === "number" ? p : (p?.progress ?? 0);
+          const text = typeof p === "object" && p ? (p.text ?? "") : "";
+          onProgress?.({ progress, text });
+        });
       }
     } catch (e) {
       const reason = workerError || e?.message || String(e);
